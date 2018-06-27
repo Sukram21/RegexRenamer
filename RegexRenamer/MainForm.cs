@@ -133,8 +133,8 @@ namespace RegexRenamer
         txtNumberingInc.ToolTipText   = txtNumberingInc.ToolTipText.Replace( oldFile, strFile );
         txtNumberingReset.ToolTipText = txtNumberingReset.ToolTipText.Replace( oldFile, strFile );
         itmOutputMoveTo.ToolTipText   = itmOutputMoveTo.ToolTipText.Replace( oldCapFile, strCapFile );
-        itmOutputCopyTo.ToolTipText   = renameFolders ? "Nicht verfügbar während Ordner-Umbenennung" : "Dateien, die übereinstimmen, werden kopiert und die Kopien umbenannt";
-        itmOutputBackupTo.ToolTipText = renameFolders ? "Nicht verfügbar während Ordner-Umbenennung" : "Dateien, die übereinstimmen, werden kopiert und die Originale werden umbenannt";
+        itmOutputCopyTo.ToolTipText   = renameFolders ? "Nicht verfï¿½gbar wï¿½hrend Ordner-Umbenennung" : "Dateien, die ï¿½bereinstimmen, werden kopiert und die Kopien umbenannt";
+        itmOutputBackupTo.ToolTipText = renameFolders ? "Nicht verfï¿½gbar wï¿½hrend Ordner-Umbenennung" : "Dateien, die ï¿½bereinstimmen, werden kopiert und die Originale werden umbenannt";
         miRegexReplaceOrigAll.Text    = miRegexReplaceOrigAll.Text.Replace( oldFilename, strFilename );
         itmOptionsShowHidden.Text     = itmOptionsShowHidden.Text.Replace( oldFile, strFile );
         colFilename.HeaderText        = strCapFilename;
@@ -678,7 +678,19 @@ namespace RegexRenamer
 
       UpdateFileList();
     }
-    private void UpdateFileList()
+
+    private string GetRelevantPath(FileSystemInfo file)
+    {
+        DirectoryInfo activeDir = new DirectoryInfo(activePath);
+        return file.FullName.Substring(activeDir.FullName.Length+1);
+    }
+    private string GetRelevantPath(RRItem file)
+    {
+        DirectoryInfo activeDir = new DirectoryInfo(activePath);
+        return file.Fullpath.Substring(activeDir.FullName.Length+1);
+    }
+
+        private void UpdateFileList()
     {
       if( !EnableUpdates ) return;
       dgvFiles.Tag = 0;  // reset files ignored
@@ -751,12 +763,13 @@ namespace RegexRenamer
         {
           fileCount.total++;
 
-          // ignore if filtered out
+                    // ignore if filtered out
 
-          if( filter != null && filter.IsMatch( dir.Name ) == cbFilterExclude.Checked )
+          string relevantPath = GetRelevantPath(dir);
+          if ( filter != null && filter.IsMatch(relevantPath) == cbFilterExclude.Checked )
           {
-            if( !inactiveFiles.ContainsKey( dir.Name.ToLower() ) )
-              inactiveFiles.Add( dir.Name.ToLower(), InactiveReason.Filtered );
+            if( !inactiveFiles.ContainsKey(relevantPath.ToLower() ) )
+              inactiveFiles.Add(relevantPath.ToLower(), InactiveReason.Filtered );
             fileCount.filtered++;
             continue;
           }
@@ -773,8 +786,8 @@ namespace RegexRenamer
           if( hidden ) fileCount.hidden++;
           if( !itmOptionsShowHidden.Checked && hidden )
           {
-            if( !inactiveFiles.ContainsKey( dir.Name.ToLower() ) )
-              inactiveFiles.Add( dir.Name.ToLower(), InactiveReason.Hidden );
+            if( !inactiveFiles.ContainsKey(relevantPath.ToLower() ) )
+              inactiveFiles.Add(relevantPath.ToLower(), InactiveReason.Hidden );
             continue;
           }
 
@@ -786,7 +799,7 @@ namespace RegexRenamer
         FileInfo[] files = new FileInfo[0];
         try
         {
-          files = activeDir.GetFiles();
+          files = activeDir.GetFiles("*.*",SearchOption.AllDirectories);
         }
         catch( Exception ex )
         {
@@ -797,13 +810,15 @@ namespace RegexRenamer
         {
           fileCount.total++;
 
+          var fileName = GetRelevantPath(file);
+
 
           // ignore if filtered out
 
-          if( filter != null && filter.IsMatch( file.Name ) == cbFilterExclude.Checked )
+         if ( filter != null && filter.IsMatch( fileName ) == cbFilterExclude.Checked )
           {
-            if( !inactiveFiles.ContainsKey( file.Name.ToLower() ) )
-              inactiveFiles.Add( file.Name.ToLower(), InactiveReason.Filtered );
+            if( !inactiveFiles.ContainsKey( fileName.ToLower() ) )
+              inactiveFiles.Add( fileName.ToLower(), InactiveReason.Filtered );
             fileCount.filtered++;
             continue;
           }
@@ -821,8 +836,8 @@ namespace RegexRenamer
           if( hidden ) fileCount.hidden++;
           if( !itmOptionsShowHidden.Checked && hidden )
           {
-            if( !inactiveFiles.ContainsKey( file.Name.ToLower() ) )
-              inactiveFiles.Add( file.Name.ToLower(), InactiveReason.Hidden );
+            if( !inactiveFiles.ContainsKey( fileName.ToLower() ) )
+              inactiveFiles.Add( fileName.ToLower(), InactiveReason.Hidden );
             continue;
           }
 
@@ -847,7 +862,7 @@ namespace RegexRenamer
 
         // add new item
 
-        dgvFiles.Rows.Add( null, activeFiles[i].Name, null );
+        dgvFiles.Rows.Add( null, GetRelevantPath(activeFiles[i]), null );
         dgvFiles.Rows[i].Tag = i;  // store activeFiles index so we can refer back when under different sorting
 
 
@@ -956,14 +971,15 @@ namespace RegexRenamer
         {
           // check if matches
 
-          activeFiles[afi].Matched = regex.IsMatch( activeFiles[afi].Name );
+          string relevantPath = GetRelevantPath(activeFiles[afi]);
+          activeFiles[afi].Matched = regex.IsMatch(relevantPath);
 
 
           // if not, bail early, don't incrememnt autonum
 
           if( !activeFiles[afi].Matched )
           {
-            activeFiles[afi].Preview = activeFiles[afi].Name;
+            activeFiles[afi].Preview = relevantPath;
             continue;
           }
 
@@ -1009,13 +1025,13 @@ namespace RegexRenamer
           if( !itmChangeCaseNoChange.Checked )
             replacePattern = "\n" + replacePattern + "\n";  // delimit change-case boundaries
           
-          activeFiles[afi].Preview = regex.Replace( activeFiles[afi].Name, replacePattern, count );
+          activeFiles[afi].Preview = regex.Replace( relevantPath, replacePattern, count );
 
           if( !itmChangeCaseNoChange.Checked )
             activeFiles[afi].Preview = Regex.Replace( activeFiles[afi].Preview, @"\n([^\n]*)\n", new MatchEvaluator( MatchEvalChangeCase ) );
 
           if( activeFiles[afi].Preview.Length == 0 )
-            activeFiles[afi].Preview = activeFiles[afi].Name;
+            activeFiles[afi].Preview = relevantPath;
         }
 
       }
@@ -1023,7 +1039,7 @@ namespace RegexRenamer
       {
         foreach( RRItem file in activeFiles )
         {
-          file.Preview = file.Name;
+          file.Preview = GetRelevantPath(file);
           file.Matched = false;
         }
       }
@@ -1188,8 +1204,13 @@ namespace RegexRenamer
         }
         else  // destination is other directory, check against file system
         {
+          var relevantPath = GetRelevantPath(activeFiles[afi]);
+          if (activeFiles[afi].PreviewExt.Equals(relevantPath))
+            continue; //File is not being renamed
+
           string previewFullpath = Path.Combine( outputPath, activeFiles[afi].PreviewExt );
 
+          
           if( RenameFolders ? Directory.Exists( previewFullpath ) : File.Exists( previewFullpath ) )
           {
             dgvFiles.Rows[dfi].Cells[2].Tag = "The " + strFilename + " '"
@@ -1247,7 +1268,7 @@ namespace RegexRenamer
 
         if( dgvFiles.Rows[dfi].Cells[2].Tag != null )
           dgvFiles.Rows[dfi].Cells[2].Style.ForeColor = Color.Red;
-        else if( itmOutputRenameInPlace.Checked && activeFiles[afi].Name != activeFiles[afi].Preview )
+        else if( itmOutputRenameInPlace.Checked && GetRelevantPath(activeFiles[afi]) != activeFiles[afi].Preview )
           dgvFiles.Rows[dfi].Cells[2].Style.ForeColor = Color.Blue;
         else if( !itmOutputRenameInPlace.Checked && activeFiles[afi].Matched )
           dgvFiles.Rows[dfi].Cells[2].Style.ForeColor = Color.Blue;
@@ -2075,14 +2096,14 @@ namespace RegexRenamer
         // update dialog text
 
         if( clickedMenuItem == itmOutputMoveTo )
-          fbdMoveCopy.Description = "Während der Umbenennungsaktion werden Dateien, die mit dem aktuellen regex übereinstimmen, "
-                                  + "in den ausgwählten Ordner verschoben und umbenannt (falls nötig).";
+          fbdMoveCopy.Description = "Wï¿½hrend der Umbenennungsaktion werden Dateien, die mit dem aktuellen regex ï¿½bereinstimmen, "
+                                  + "in den ausgwï¿½hlten Ordner verschoben und umbenannt (falls nï¿½tig).";
         else if( clickedMenuItem == itmOutputCopyTo )
-          fbdMoveCopy.Description = "Während the Umbenennungsaktion werden Dateien, die mit dem aktuellen regex übereinstimmen, "
-                                  + "in den ausgewählten Ordner kopiert und ihre Kopien umbenannt (falls nötig).";
+          fbdMoveCopy.Description = "Wï¿½hrend the Umbenennungsaktion werden Dateien, die mit dem aktuellen regex ï¿½bereinstimmen, "
+                                  + "in den ausgewï¿½hlten Ordner kopiert und ihre Kopien umbenannt (falls nï¿½tig).";
         else if( clickedMenuItem == itmOutputBackupTo )
-          fbdMoveCopy.Description = "Während the Umbenennungsaktion werden Dateien, die mit dem aktuellen regex übereinstimmen, "
-                                  + "in den ausgewählten Ordner kopiert und die Originale umbenannt (falls nötig).";
+          fbdMoveCopy.Description = "Wï¿½hrend the Umbenennungsaktion werden Dateien, die mit dem aktuellen regex ï¿½bereinstimmen, "
+                                  + "in den ausgewï¿½hlten Ordner kopiert und die Originale umbenannt (falls nï¿½tig).";
 
 
         // show dialog, ignore if cancelled
@@ -2112,7 +2133,7 @@ namespace RegexRenamer
           if( clickedMenuItem == itmOutputMoveTo ) errorMessage += "Verschieben nach";
           else if( clickedMenuItem == itmOutputCopyTo ) errorMessage += "Kopieren nach";
           else if( clickedMenuItem == itmOutputBackupTo ) errorMessage += "Backup nach";
-          errorMessage += "' Ordner ist der selbe wie der aktuell ausgewählte Ordner.\r\n";
+          errorMessage += "' Ordner ist der selbe wie der aktuell ausgewï¿½hlte Ordner.\r\n";
 
           MessageBox.Show( errorMessage, "Warnung", MessageBoxButtons.OK, MessageBoxIcon.Warning );
         }
@@ -2567,10 +2588,10 @@ namespace RegexRenamer
       Regex regex = new Regex( "^[ .]" );
       if( regex.IsMatch( newFilename ) && !regex.IsMatch( activeFiles[afi].Filename ) )  // now starts with [ .]
       {
-        errorMessage = "Dieser " + strFilename + " beginnt mit einem Leerzeichen oder Punkt. Das ist zwar technisch möglich, Windows\n"
-                     + "lässt dies aber normalerweise nicht zu, weil es zu Problemen mit anderen Programmen führen könnte.\n"
+        errorMessage = "Dieser " + strFilename + " beginnt mit einem Leerzeichen oder Punkt. Das ist zwar technisch mï¿½glich, Windows\n"
+                     + "lï¿½sst dies aber normalerweise nicht zu, weil es zu Problemen mit anderen Programmen fï¿½hren kï¿½nnte.\n"
                      + "\n"
-                     + "Sie Sie sicher, dass Sie fortfahren möchten?";
+                     + "Sie Sie sicher, dass Sie fortfahren mï¿½chten?";
 
         if( MessageBox.Show( errorMessage, "Warning", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning )
             == DialogResult.Cancel )
@@ -2856,7 +2877,7 @@ namespace RegexRenamer
 
       // invalid match regex
 
-      if( !validMatch ) errorMessage = "Der reguläre Ausdruck in 'Finden' ist nicht gültig.";
+      if( !validMatch ) errorMessage = "Der regulï¿½re Ausdruck in 'Finden' ist nicht gï¿½ltig.";
 
 
       // preview errors exist
@@ -2871,7 +2892,7 @@ namespace RegexRenamer
 
           if( row.Cells[2].Tag != null )
           {
-            errorMessage = "Umbennen, während Fehler existieren, nicht möglich (rot markiert).";
+            errorMessage = "Umbennen, wï¿½hrend Fehler existieren, nicht mï¿½glich (rot markiert).";
             break;
           }
         }
@@ -2902,9 +2923,9 @@ namespace RegexRenamer
 
       if( errorMessage == null && !itmOutputRenameInPlace.Checked && !Directory.Exists( fbdMoveCopy.SelectedPath ) )
       {
-        if( itmOutputMoveTo.Checked ) errorMessage = "'Verschieben nach' Ordner '" + fbdMoveCopy.SelectedPath + "' ist kein gültiger Pfad.";
-        else if( itmOutputCopyTo.Checked ) errorMessage = "'Kopieren nach' Ordner '" + fbdMoveCopy.SelectedPath + "' ist kein gültiger Pfad.";
-        else if( itmOutputBackupTo.Checked ) errorMessage = "'Backup nach' Ordner '" + fbdMoveCopy.SelectedPath + "' ist kein gültiger Pfad.";
+        if( itmOutputMoveTo.Checked ) errorMessage = "'Verschieben nach' Ordner '" + fbdMoveCopy.SelectedPath + "' ist kein gï¿½ltiger Pfad.";
+        else if( itmOutputCopyTo.Checked ) errorMessage = "'Kopieren nach' Ordner '" + fbdMoveCopy.SelectedPath + "' ist kein gï¿½ltiger Pfad.";
+        else if( itmOutputBackupTo.Checked ) errorMessage = "'Backup nach' Ordner '" + fbdMoveCopy.SelectedPath + "' ist kein gï¿½ltiger Pfad.";
       }
 
 
@@ -2912,9 +2933,9 @@ namespace RegexRenamer
 
       if( errorMessage == null && !itmOutputRenameInPlace.Checked && fbdMoveCopy.SelectedPath == activePath )
       {
-        if( itmOutputMoveTo.Checked ) errorMessage = "'Verschieben nach' Ordner ist der selbe wie der aktuell ausgewählte Ordner.";
-        else if( itmOutputCopyTo.Checked ) errorMessage = "'Kopieren nach' Ordner ist der selbe wie der aktuell ausgewählte Ordner.";
-        else if( itmOutputBackupTo.Checked ) errorMessage = "'Backup nach' Ordner ist der selbe wie der aktuell ausgewählte Ordner.";
+        if( itmOutputMoveTo.Checked ) errorMessage = "'Verschieben nach' Ordner ist der selbe wie der aktuell ausgewï¿½hlte Ordner.";
+        else if( itmOutputCopyTo.Checked ) errorMessage = "'Kopieren nach' Ordner ist der selbe wie der aktuell ausgewï¿½hlte Ordner.";
+        else if( itmOutputBackupTo.Checked ) errorMessage = "'Backup nach' Ordner ist der selbe wie der aktuell ausgewï¿½hlte Ordner.";
       }
 
 
@@ -2952,10 +2973,10 @@ namespace RegexRenamer
 
       if( beginWithInvalidChars )
       {
-        errorMessage = "Einer oder mehrere " + strFilename + " beginnen mit einem Leerzeichen oder Punkt. Das ist zwar technisch möglich, Windows\n"
-                     + "lässt dies aber normalerweise nicht zu, weil es zu Problemen mit anderen Programmen führen könnte.\n"
+        errorMessage = "Einer oder mehrere " + strFilename + " beginnen mit einem Leerzeichen oder Punkt. Das ist zwar technisch mï¿½glich, Windows\n"
+                     + "lï¿½sst dies aber normalerweise nicht zu, weil es zu Problemen mit anderen Programmen fï¿½hren kï¿½nnte.\n"
                      + "\n"
-                     + "Sie Sie sicher, dass Sie fortfahren möchten?";
+                     + "Sie Sie sicher, dass Sie fortfahren mï¿½chten?";
 
         if( MessageBox.Show( errorMessage, "Warnung", MessageBoxButtons.OKCancel, MessageBoxIcon.Warning )
             == DialogResult.Cancel )
